@@ -1,0 +1,246 @@
+<html>
+<head>
+    <title>Whatever</title>
+    <link href="/css/main.css" rel="stylesheet" media="all"></link>
+</head>
+<body>
+<nav>
+    <ul>
+        <li><a href="/index.html">Home</a></li>
+        <li><a href="/contact.html">Contact</a></li>
+    </ul>
+</nav>
+<article>
+    <p>These are notes on how to configure OpenSSL to make this possible:</p>
+
+<pre><code>$ openssl req -new -key ~/my/key -out request.csr
+$ openssl ca -in request.csr -out cert.pem
+$ ls
+cert.pem
+request.csr
+</code></pre>
+
+<h1>OpenSSL</h1>
+
+<p>Man page:</p>
+
+<pre><code>$ man openssl
+</code></pre>
+
+<blockquote>
+<p>TL;DR: &ldquo;OpenSSL does all sorts of cryptography stuff.&rdquo;</p>
+</blockquote>
+
+<p>At the bottom of the man page you&rsquo;ll find references to other man pages. These are all man
+pages for OpenSSL sub-commands - to run the command described in <code>man ca</code> you need to run
+<code>openssl ca</code>, and so-on.</p>
+
+<h1>Configure your Certificate Authority (&ldquo;CA&rdquo;)</h1>
+
+<p>Man page:</p>
+
+<pre><code>$ man ca
+</code></pre>
+
+<blockquote>
+<p>TL;DR: &ldquo;Used to sign certificate requests, generate CRLs and maintain a database of issued
+certificates.&rdquo; You will also find documentation on CA configuration.</p>
+</blockquote>
+
+<p>On Ubuntu you&rsquo;ll find your CA configuration file already exists at <code>/etc/ssl/openssl.cnf</code>.
+Pay attention to this configuration, especially:</p>
+
+<pre><code>dir         = /etc/ssl
+certificate = $dir/cacert.pem
+private_key = $dir/private/cakey.pem
+</code></pre>
+
+<p>You&rsquo;ll want to make sure the following configuration references things which exist:</p>
+
+<pre><code>new_certs_dir = $dir/newcerts
+database      = $dir/index.txt
+serial        = $dir/serial
+
+$ sudo mkdir /etc/ssl/newcerts
+$ sudo touch /etc/ssl/index.txt
+$ echo &quot;01&quot; | sudo tee /etc/ssl/serial
+</code></pre>
+
+<h1>Policies</h1>
+
+<p>Note this in the configuration:</p>
+
+<pre><code>policy = policy_match
+</code></pre>
+
+<p>When you create your CA&rsquo;s root certificate (next step), all certificate requests must adhere
+to your policy. You can configure multiple policies - you might have some defaults:</p>
+
+<pre><code>[ policy_match ]
+countryName             = match
+stateOrProvinceName     = match
+organizationName        = match
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+
+[ policy_anything ]
+countryName             = optional
+stateOrProvinceName     = optional
+localityName            = optional
+organizationName        = optional
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+</code></pre>
+
+<p>This default <code>policy_match</code> policy will require that any certificate request has
+the same countryName, stateOrProvinceName and organizationName as the CA&rsquo;s root certificate.</p>
+
+<p>To make your habits good by default I suggest that you create a new policy - e.g.
+<code>policy_match_organisation</code> - and configure it how you like, setting it as the default policy.
+I like to change <code>policy_anything</code> so commonName is optional too.</p>
+
+<h1>Create your root certificate</h1>
+
+<p>Man page:</p>
+
+<pre><code>$ man req
+</code></pre>
+
+<blockquote>
+<p>TL;DR: &ldquo;Creates and processes certificate requests.&rdquo;</p>
+</blockquote>
+
+<p>You&rsquo;ll find an example: &ldquo;Generate a self signed root certificate.&rdquo;</p>
+
+<pre><code>$ openssl req -x509 -newkey rsa:2048 -keyout key.pem -out req.pem
+</code></pre>
+
+<p>Look up the documentation for each argument:</p>
+
+<pre><code>-x509
+  outputs a self signed certificate
+-newkey
+  this option creates a new certificate request and a new private key
+-keyout
+  the filename to write the newly created private key to
+-out
+  the output filename to write to 
+</code></pre>
+
+<p>Ok, let&rsquo;s run it, but we&rsquo;ll set the paths for the keys to what we saw in our configuration
+earlier - so we&rsquo;ll need to be root, too.</p>
+
+<pre><code>$ sudo openssl req -x509 -newkey rsa:2048 -keyout /etc/ssl/private/cakey.pem -out /etc/ssl/cacert.pem
+</code></pre>
+
+<p>Congratulations, you are now a certificate authority.</p>
+
+<h1>Request a certificate</h1>
+
+<p>Now you want to start issuing certificates. Anybody who wants a certificate has to create a
+certificate request.</p>
+
+<h2>Create a key</h2>
+
+<p>Man page:</p>
+
+<pre><code>$ man genpkey
+</code></pre>
+
+<blockquote>
+<p>TL;DR: &ldquo;Generates private keys.&rdquo;</p>
+</blockquote>
+
+<p>Cool, let&rsquo;s do that.</p>
+
+<pre><code>$ openssl genpkey -algorithm RSA -out key.pem -pkeyopt rsa_keygen_bits:2048
+$ ls | grep key
+key.pem
+</code></pre>
+
+<p>This key identifies the entity requesting the certificate. (You could just use your ssh
+key, even).</p>
+
+<h2>Create a certificate request</h2>
+
+<p>Man page:</p>
+
+<pre><code>$ man req
+</code></pre>
+
+<blockquote>
+<p>TL;DR: &ldquo;Creates and processes certificate requests.&rdquo;</p>
+</blockquote>
+
+<pre><code>$ openssl req -new -key key.pem -out request.csr
+[ ... answer the questions ... ]
+$ ls | grep csr
+request.csr
+</code></pre>
+
+<p>Hooray, we have a certificate request.</p>
+
+<h1>Process the request</h1>
+
+<p>Now we have a request for a certificate, we want to create a certificate.</p>
+
+<p>Back to this man page:</p>
+
+<pre><code>$ man ca
+</code></pre>
+
+<p>One example is &ldquo;Sign a certificate request.&rdquo;</p>
+
+<pre><code>$ openssl ca -in req.pem -out newcert.pem
+</code></pre>
+
+<p>Also note this argument, elsewhere in the man page:</p>
+
+<pre><code>-policy arg
+    this option defines the CA &quot;policy&quot; to use
+</code></pre>
+
+<p>Let&rsquo;s sign the request with the &lsquo;policy_anything&rsquo; policy we saw earlier. You&rsquo;ll need
+root, as only root can read the CA key.</p>
+
+<pre><code>$ sudo openssl ca -in request.csr -out newcert.pem -policy policy_anything
+$ ls | grep pem
+key.pem
+newcert.pem
+</code></pre>
+
+<p>You&rsquo;ll also find the new certificate in newcerts with serial number 01:</p>
+
+<pre><code>$ ls /etc/ssl/newcerts
+01.pem
+</code></pre>
+
+<p>You&rsquo;ll see that the serial number has been set to the next one:</p>
+
+<pre><code>$ cat /etc/ssl/serial
+02
+</code></pre>
+
+<p>And you&rsquo;ll find an entry for your certificate in the index:</p>
+
+<pre><code>$ cat /etc/ssl/index.txt
+V   180227092316Z       01  unknown /C=UK/ST=Some-State/O=Internet Widgits Pty Ltd
+</code></pre>
+
+<p>And you can run this to get the certificate bit of your certificate:</p>
+
+<pre><code>$ grep BEGIN newcert.pem -A 1000
+-----BEGIN CERTIFICATE-----
+MIIDgDCCAmigAwIBAgIBATANBgkqhkiG9w0BAQsFADBFMQswCQYDVQQGEwJBVTET
+...
+txvPo+ilv5goqXo8FK6ghQzu8W6RtL1dmsL3sDy4pPFTJWre
+-----END CERTIFICATE-----
+</code></pre>
+
+<p>There you go. A certificate signed by your CA.</p>
+
+</article>
+</body>
+</html>
