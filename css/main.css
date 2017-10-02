@@ -1,0 +1,29 @@
+body {
+    margin: 20px 20px;
+    font-family: Arial,Helmet,Freesans,sans-serif;
+}
+
+nav ul,
+nav li {
+    margin: 0;
+    padding: 0;
+}
+nav ul {
+    display: flex;
+    flex-direction: row;
+    list-style: none;
+}
+nav ul > li {
+    flex: initial;
+    transition: width 0.7s ease-out;
+}
+nav a {
+    padding: 4px;
+    margin-right: 5px;
+    background-color: black;
+    color: azure;
+    text-decoration: none;
+}
+nav a:hover {
+    text-decoration: underline;
+}
