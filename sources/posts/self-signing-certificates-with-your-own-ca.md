@@ -1,4 +1,9 @@
-These are notes on how to configure OpenSSL to make this possible:
+Notes on how to use OpenSSL and your own CA to sign certificates. This can be very useful
+when you want to issue yourself multiple certificates, but don't want to pin against each
+of those certificates individually. Instead, trust your own CA and use it to sign your 
+certificates.
+
+Once it's configured you'll be able do this to create certificates:
 
     $ openssl req -new -key ~/my/key -out request.csr
     $ openssl ca -in request.csr -out cert.pem
@@ -12,7 +17,7 @@ Man page:
 
     $ man openssl
 
-> TL;DR: "OpenSSL does all sorts of cryptography stuff."
+> TL;DR: "OpenSSL does all sorts of cryptography stuff, not just SSL."
 
 At the bottom of the man page you'll find references to other man pages. These are all man
 pages for OpenSSL sub-commands - to run the command described in `man ca` you need to run
@@ -24,7 +29,7 @@ Man page:
 
     $ man ca
 
-> TL;DR: "Used to sign certificate requests, generate CRLs and maintain a database of issued
+> TL;DR: "Used to sign certificate requests, generate CRLs [revoked certificate lists] and maintain a database of issued
 certificates." You will also find documentation on CA configuration.
 
 On Ubuntu you'll find your CA configuration file already exists at `/etc/ssl/openssl.cnf`.
@@ -100,8 +105,8 @@ Look up the documentation for each argument:
     -out
       the output filename to write to 
 
-Ok, let's run it, but we'll set the paths for the keys to what we saw in our configuration
-earlier - so we'll need to be root, too.
+Run it, but set the paths for the keys to what we saw in our configuration earlier. We need
+to be root to use those paths.
 
     $ sudo openssl req -x509 -newkey rsa:2048 -keyout /etc/ssl/private/cakey.pem -out /etc/ssl/cacert.pem
 
@@ -114,22 +119,24 @@ certificate request.
 
 ## Create a key
 
+This key identifies the entity requesting the certificate. You could use your ssh
+key, even, but we'll generate a new one.
+
 Man page:
 
     $ man genpkey
 
 > TL;DR: "Generates private keys."
 
-Cool, let's do that.
+Following examples you'll see in the `man` page...
 
     $ openssl genpkey -algorithm RSA -out key.pem -pkeyopt rsa_keygen_bits:2048
     $ ls | grep key
     key.pem
 
-This key identifies the entity requesting the certificate. (You could just use your ssh
-key, even).
-
 ## Create a certificate request
+
+Use the key to generate a certificate request.
 
 Man page:
 
@@ -142,11 +149,11 @@ Man page:
     $ ls | grep csr
     request.csr
 
-Hooray, we have a certificate request.
+We have a certificate request.
 
 # Process the request
 
-Now we have a request for a certificate, we want to create a certificate.
+Now we have a request for a certificate, we want to create the certificate.
 
 Back to this man page:
 
@@ -156,12 +163,12 @@ One example is "Sign a certificate request."
 
     $ openssl ca -in req.pem -out newcert.pem
 
-Also note this argument, elsewhere in the man page:
+Note this argument, elsewhere in the man page:
 
     -policy arg
         this option defines the CA "policy" to use
 
-Let's sign the request with the 'policy_anything' policy we saw earlier. You'll need
+Sign the request with the 'policy_anything' policy we saw earlier. You'll need
 root, as only root can read the CA key.
 
     $ sudo openssl ca -in request.csr -out newcert.pem -policy policy_anything
@@ -179,12 +186,12 @@ You'll see that the serial number has been set to the next one:
     $ cat /etc/ssl/serial
     02
 
-And you'll find an entry for your certificate in the index:
+You'll find an entry for your certificate in the index:
 
     $ cat /etc/ssl/index.txt
     V	180227092316Z		01	unknown	/C=UK/ST=Some-State/O=Internet Widgits Pty Ltd
 
-And you can run this to get the certificate bit of your certificate:
+You can grep out the certificate text from the `.pem` file:
 
     $ grep BEGIN newcert.pem -A 1000
     -----BEGIN CERTIFICATE-----

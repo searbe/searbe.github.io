@@ -6,10 +6,12 @@
 <body>
 <nav>
     <ul>
-        <li><a href="/">Home</a></li>
-        <li><a href="/contact.html">Contact</a></li>
+        {{ range $page := .Website.Pages }}
+            <li><a href="/{{$page.Id}}.html">{{ $page.Meta.Title }}</a></li>
+        {{ end }}
     </ul>
 </nav>
+<header><h1>{{.Document.Meta.Title}}</h1><hr /></header>
 <article>
     {{.Contents}}
 </article>
