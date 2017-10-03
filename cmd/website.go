@@ -7,29 +7,42 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/russross/blackfriday"
+	"sort"
 )
 
 type Website struct {
 	template *template.Template
-	Posts    []*Document
-	Pages    []*Document
+	Posts    []Document
+	Pages    []Document
 }
 
-func New(postPath string, pagePath string, templatePath string) *Website {
+type PageInfo struct {
+	Document Document
+	Website  Website
+	Contents template.HTML
+}
+
+func New(postPath string, pagePath string, templatePath string) Website {
 	t, err := template.ParseFiles(templatePath)
 
 	if err != nil {
 		panic(err)
 	}
 
-	return &Website {
+	posts := ReadFrom(postPath)
+	pages := ReadFrom(pagePath)
+
+	sort.Sort(NewestFirst(posts))
+	sort.Sort(NewestFirst(pages))
+
+	return Website {
 		template: t,
-		Posts:    ReadFrom(postPath),
-		Pages:    ReadFrom(pagePath),
+		Posts:    posts,
+		Pages:    pages,
 	}
 }
 
-func (w *Website) WriteTo(outputPath string) {
+func (w Website) WriteTo(outputPath string) {
 	for _, doc := range w.Pages {
 		write(outputPath, doc, w)
 	}
@@ -42,7 +55,7 @@ func (w *Website) WriteTo(outputPath string) {
 	}
 }
 
-func write (path string, d *Document, s *Website) {
+func write (path string, d Document, s Website) {
 	path, err := filepath.Abs(filepath.Join(path, d.Id + ".html"))
 
 	if err != nil {
@@ -57,22 +70,22 @@ func write (path string, d *Document, s *Website) {
 
 	defer f.Close()
 
-	input := TemplateInput{
+	pageInfo := PageInfo{
 		Document: d,
 		Website: s,
 	}
 
 	buf := new(bytes.Buffer)
 
-	if err := d.Contents.Execute(buf, input); err != nil {
+	if err := d.Contents.Execute(buf, pageInfo); err != nil {
 		panic(err)
 	}
 
-	input.Contents = template.HTML(blackfriday.MarkdownCommon(buf.Bytes()))
+	pageInfo.Contents = template.HTML(blackfriday.MarkdownCommon(buf.Bytes()))
 
 	w := bufio.NewWriter(f)
 
-	if err = s.template.Execute(w, input); err != nil {
+	if err = s.template.Execute(w, pageInfo); err != nil {
 		panic(err)
 	}
 
