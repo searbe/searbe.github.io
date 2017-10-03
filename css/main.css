@@ -1,6 +1,9 @@
 body {
-    margin: 20px 20px;
+    margin: 0 auto;
+    padding: 20px;
     font-family: Arial,Helmet,Freesans,sans-serif;
+    max-width: 1000px;
+    overflow-y: scroll;
 }
 
 nav ul,
@@ -18,7 +21,7 @@ nav ul > li {
     transition: width 0.7s ease-out;
 }
 nav a {
-    padding: 4px;
+    padding: 4px 8px;
     margin-right: 5px;
     background-color: black;
     color: azure;
