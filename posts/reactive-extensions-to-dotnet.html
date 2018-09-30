@@ -1,0 +1,100 @@
+<html>
+<head>
+    <title>Reactive Extensions to .Net; a quick-start | Craig Bendell (Searbe)</title>
+    <link href="/css/main.css" rel="stylesheet" media="all"></link>
+</head>
+<body>
+<nav>
+    <ul>
+        
+            <li><a href="/index.html">Recent Posts</a></li>
+        
+            <li><a href="/contact.html">Contact</a></li>
+        
+    </ul>
+</nav>
+<header><h1>Reactive Extensions to .Net; a quick-start</h1><hr /></header>
+<article>
+    <p>This aims to get to the point with <a href="https://github.com/dotnet/reactive">Reactive Extensions to .Net</a>. If you want to drill down further, I suggest you read the fanstastic book at <a href="http://www.introtorx.com/">IntroToRx</a>.</p>
+
+<p>If you get bored, at least read the summary and advice at the end.</p>
+
+<h2>Observers</h2>
+
+<p><code>IObservable&lt;T&gt;</code> is a stream of <code>T</code> which an <code>IObserver&lt;T&gt;</code> can be subscribed to, a-la <code>observable.Subscribe(observer)</code>.</p>
+
+<p>Thus, an <code>IObserver&lt;T&gt;</code> observes instances of <code>T</code>.</p>
+
+<p>An <code>IObservable&lt;T&gt;</code> will call <code>.OnNext()</code>, <code>.OnError()</code> or <code>.OnCompleted()</code> methods on each observer. When an observer receives <code>.OnComplete()</code> or <code>.OnError()</code>, it should expect no further errors or values.</p>
+
+<p>There are overloads / extension methods for <code>IObservable&lt;T&gt;.Subscribe</code> which allow you to subscribe with a <code>(T t) =&gt; {}</code>, rather than an <code>IObserver&lt;T&gt;</code> implementation.</p>
+
+<h2>Subjects</h2>
+
+<p><code>Subject&lt;T&gt;</code> implements both interfaces. Anything pushed to it via <code>IObserver&lt;T&gt;.OnNext</code> is pushed to <em>it&rsquo;s own</em> observers. Observers are registered through the subject&rsquo;s implementation of the <code>IObservable&lt;T&gt;</code> interface.</p>
+
+<p><code>Subject&lt;T&gt;</code> implements <code>ISubject&lt;T&gt;</code>, which itself implements <code>ISubject&lt;TSource, TResult&gt;</code> where both types are the same. That is; it is entirely possible for a subject to accept one type but publish another.</p>
+
+<p>????? <code>Subject.Create()</code> accepts an <code>IObserver&lt;TSource&gt;</code> and an <code>IObservable&lt;TResult&gt;</code>. This is the easiest way to utilise a subject with different input and output types.</p>
+
+<p><code>ReplaySubject&lt;T&gt;</code> caches values; observers will receive events even if they subscribe <em>after</em> events are published. A replay subject has a configurable <code>bufferSize</code> and a configurable time window.</p>
+
+<p><code>BehaviourSubject&lt;T&gt;</code> always contains a buffer of one <code>T</code> - so something which observes it will immediately get one value. When you construct a <code>BehaviourSubject&lt;T&gt;</code> you must provide the intitial <code>T</code>.</p>
+
+<p><code>AsyncSubject&lt;T&gt;</code> buffers one value but doesn&rsquo;t publish it until it&rsquo;s <code>.OnComplete()</code> method is called.</p>
+
+<h2>Lifetime Management</h2>
+
+<p><code>Subscribe()</code> will return an <code>IDisposable</code>. You should dispose it when you want to cancel the subscription. Consider utilizing C#&rsquo;s <code>using (){}</code> statement.</p>
+
+<p>There are overloads which accept cancellation tokens. Be careful not to end up with subscriptions which are never cancelled.</p>
+
+<h2>Creating sequences</h2>
+
+<p><code>Observable</code> has static methods which return <code>IObservable&lt;T&gt;</code> implementations:</p>
+
+<pre><code>Observable.Return&lt;string&gt;(&quot;Value&quot;) // Returns one value to observer
+Observable.Empty&lt;string&gt;() // Calls OnComplete() instantly
+Observable.Never&lt;string&gt;() // Never completes
+Observable.Throw&lt;string&gt;(e) // Calls OnError(e) instantly
+</code></pre>
+
+<p>An <code>Observable.Create()</code> method takes a factory delegate. The factory delegate is called every time an observer subscribes to the create observable. The expected return type is the IDisposable which should be given back to the call site (see Lifetime Management).</p>
+
+<p><code>Observable.Generate()</code> exists for creating sequences. It accepts a start value and three delegates: <code>.Generate(startValue, shouldContinue, generateNextValue, getCurrentValue)</code>.</p>
+
+<p><code>Observable.Interval()</code> and <code>Observable.Timer()</code> call their observers over time.</p>
+
+<p><code>Observable.Start(fn)</code> calls <code>fn</code> repeatedly, publishing whatever it returns.</p>
+
+<p>You get the idea. Check out these other ways to create observables:</p>
+
+<pre><code>Observable.Start
+Observable.FromEventPattern
+Task.ToObservable
+Task&lt;T&gt;.ToObservable
+IEnumerable&lt;T&gt;.ToObservable
+Observable.FromAsyncPattern
+</code></pre>
+
+<h2>Reduce, Join, Aggregate, Map</h2>
+
+<p>Rx provides LINQ-esque methods over observables.</p>
+
+<p>You&rsquo;re able to <code>.Where</code> etc and <code>.Subscribe</code> to that result. <code>.Select</code>, <code>.SelectMany</code>, etc shouldn&rsquo;t be a surprise to you - they turn an <code>IObservable&lt;T1&gt;</code> in to an <code>IObservable&lt;T2&gt;</code> in a far more convenient way than setting up <code>ISubject&lt;T1, T2&gt;</code>s which achieve the same thing.</p>
+
+<h2>Summary and advice</h2>
+
+<p>Go and play with it. Create a <code>Subject</code>, attach some <code>IObserver</code>s, call <code>subject.OnNext(new MyType)</code> and watch your observers get called.</p>
+
+<p>Don&rsquo;t get obsessed with Rx.</p>
+
+<p>Consider Rx when you&rsquo;re not in control of the input stream; Rx solves &ldquo;The data is here, what are you going to do about it?&rdquo;, but not so much &ldquo;I&rsquo;ve finished processing this data, time to get some more&rdquo;.</p>
+
+<p>Be suspcious when you see <code>async</code> inside observers (<code>Subscribe(async() =&gt; {})</code>). Is it doing what you think it&rsquo;s doing? Are you sure? Prove it.</p>
+
+<p>Experiment with <a href="https://www.reactivemanifesto.org/glossary#Back-Pressure">back-pressure</a> until you understand where Rx makes it hard. This is <em>especially</em> important when you throw <code>async</code> in to the mix; what happens when something in your pipeline is <code>async</code>?</p>
+
+</article>
+</body>
+</html>
